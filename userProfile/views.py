@@ -52,28 +52,36 @@ def user_stats(request):
 def register(request):
     """
     Register a new user with proper password hashing
-    ---
-    parameters:
-      - name: username
-      - name: email
-      - name: password
     """
     serializer = UserSerializer(data=request.data)
     
     if serializer.is_valid():
-        # Hash password before saving
-        validated_data = serializer.validated_data
-        validated_data['password'] = make_password(validated_data['password'])
+        try:
+            # Hash password before saving
+            validated_data = serializer.validated_data
+            validated_data['password'] = make_password(validated_data['password'])
+            
+            user = User.objects.create(**validated_data)
+            
+            return Response({
+                'status': 'success',
+                'user_id': user.id,
+                'email': user.email
+            }, status=status.HTTP_201_CREATED)
         
-        user = User.objects.create(**validated_data)
-        
-        return Response({
-            'status': 'success',
-            'user_id': user.id,
-            'email': user.email
-        }, status=status.HTTP_201_CREATED)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Catch any unexpected errors
+            return Response({
+                'status': 'error',
+                'message': f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # If serializer is invalid
+    return Response({
+        'status': 'error',
+        'message': 'Registration failed. Please check the provided details.',
+        'errors': serializer.errors  # <-- still keep field-specific errors
+    }, status=status.HTTP_400_BAD_REQUEST)
 
 @csrf_exempt
 @login_required
